@@ -42,6 +42,7 @@
 #include "debug.h"
 #include "line.h"
 #include "fixedpoint.h"
+#include "cg_scene.h"
 
 #define ICON_PADDING 1
 #define ICON_PADDING_S "1"
@@ -216,6 +217,10 @@ void list_draw(struct screen *display, struct gui_synclist *list)
     else
         callback_draw_item = _default_listdraw_fn;
 
+#ifdef CG_SCENE_ENABLED
+    /* animated ClickGotchi scene as backdrop, unless a theme backdrop is set */
+    const bool cg_active = (screen == SCREEN_MAIN) && cg_scene_attach(current_tick);
+#endif
     struct viewport * last_vp = display->set_viewport(parent);
     display->clear_viewport();
     if (!list->scroll_all)
@@ -427,6 +432,19 @@ void list_draw(struct screen *display, struct gui_synclist *list)
                 linedes.text_color = c;
                 style |= STYLE_COLORED;
             }
+        }
+#endif
+#ifdef CG_SCENE_ENABLED
+        linedes.outline = false;
+        if (cg_active && !is_selected && style == STYLE_DEFAULT)
+        {   /* black or white text by the scene luma behind this row, with an
+             * opposite-colour outline where the scene is mid-tone */
+            int luma = cg_row_luma(list_text_vp->x,
+                                   list_text_vp->y + line * linedes.height + draw_offset,
+                                   list_text_vp->width, linedes.height);
+            linedes.text_color = luma >= 128 ? LCD_BLACK : LCD_WHITE;
+            linedes.outline = (luma >= 90 && luma <= 170);
+            style |= STYLE_COLORED;
         }
 #endif
         linedes.style = style;

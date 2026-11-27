@@ -140,6 +140,22 @@ static void put_text(struct screen *display,
 
     display->set_drawmode(drmode);
 
+#ifdef HAVE_LCD_COLOR
+    if (line->outline && display->depth >= 16 && !(line->style & STYLE_INVERT))
+    {
+        /* outline: the text shifted by 1px in each direction in the opposite
+         * colour; the main text is drawn on top below */
+        static const signed char ofs[4][2] = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
+        unsigned fg = display->get_foreground();
+        int i;
+        display->set_foreground(fg == LCD_BLACK ? LCD_WHITE : LCD_BLACK);
+        for (i = 0; i < 4; i++)
+            display->putsxy_scroll_func(x + ofs[i][0], y + ofs[i][1], text,
+                                        NULL, NULL, text_skip_pixels);
+        display->set_foreground(fg);
+    }
+#endif
+
     if (line->scroll && !prevent_scroll)
     {
         bool scrolls;

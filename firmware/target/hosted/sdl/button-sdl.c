@@ -373,8 +373,63 @@ int sdl_event_filter(void *userdata, SDL_Event * event)
 }
 #endif
 
+/* Test input channel (fork-only, sim builds). If RB_SIM_FIFO is set, read lines
+ * "<key> [ms]" from that named pipe. Each line pushes a KEYDOWN, waits ms
+ * (default 150), then pushes a KEYUP. Events go into SDL's own queue, so no
+ * window focus is needed. <key> is an SDL key name such as Return, Escape,
+ * Up, Down, Left, Right, Space. */
+static int sim_fifo_thread(void *arg)
+{
+    const char *path = (const char *)arg;
+    char line[128];
+
+    for(;;) {
+        FILE *f = fopen(path, "r");
+        if(!f) {
+            SDL_Delay(500);
+            continue;
+        }
+        while(fgets(line, sizeof line, f)) {
+            char name[64];
+            int ms = 150;
+            if(sscanf(line, "%63s %d", name, &ms) < 1)
+                continue;
+            SDL_Keycode code = SDL_GetKeyFromName(name);
+            if(code == SDLK_UNKNOWN)
+                continue;
+            if(ms < 20) ms = 20;
+            if(ms > 5000) ms = 5000;
+            SDL_Event ev;
+            memset(&ev, 0, sizeof ev);
+            ev.type = SDL_KEYDOWN;
+            ev.key.state = SDL_PRESSED;
+            ev.key.keysym.sym = code;
+            SDL_PushEvent(&ev);
+            SDL_Delay(ms);
+            memset(&ev, 0, sizeof ev);
+            ev.type = SDL_KEYUP;
+            ev.key.state = SDL_RELEASED;
+            ev.key.keysym.sym = code;
+            SDL_PushEvent(&ev);
+        }
+        fclose(f);
+    }
+    return 0;
+}
+
+static void sim_fifo_start(void)
+{
+    static char fifo_path[512];
+    const char *env = getenv("RB_SIM_FIFO");
+    if(!env || !*env)
+        return;
+    strlcpy(fifo_path, env, sizeof fifo_path);
+    SDL_CreateThread(sim_fifo_thread, "simfifo", fifo_path);
+}
+
 void gui_message_loop(void)
 {
+    sim_fifo_start();
     SDL_Event event;
     bool quit;
 

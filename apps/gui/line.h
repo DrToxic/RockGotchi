@@ -73,6 +73,9 @@ struct line_desc {
     enum line_styles style;
     /* whether the line can scroll */
     bool scroll;
+    /* draw the text with a 1px outline in the opposite colour (black/white)
+     * for legibility on busy backgrounds. Colour displays only. */
+    bool outline;
     /* height of the line separator (in pixels). 0 to disable drawing
      * of the separator */
     int8_t separator_height;
